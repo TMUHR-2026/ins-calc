@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>勞健保費試算</title>
+<style>
+:root{box-sizing:border-box;--bg:#f6f7f9;--card:#fff;--tx:#1f2937;--mu:#6b7280;--ac:#0f6cbd;--bd:#d9dde3;--wn:#fff4e0;--wt:#8a5a00;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15181d;--card:#1e232a;--tx:#e6e8eb;--mu:#98a1ad;--ac:#5aa9ee;--bd:#363d47;--wn:#3a2e14;--wt:#f0c674;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#15181d;--card:#1e232a;--tx:#e6e8eb;--mu:#98a1ad;--ac:#5aa9ee;--bd:#363d47;--wn:#3a2e14;--wt:#f0c674;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.6 "Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif}
+main{max-width:860px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:4px 0 12px}
+h2{font-size:16px;margin:16px 0 8px}
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+.tabs button{flex:1;padding:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:8px;cursor:pointer;font:inherit}
+.tabs button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+label{display:block;font-size:13px;color:var(--mu)}
+input,select,textarea{width:100%;padding:7px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit}
+textarea{min-height:70px;font-size:12px}
+.warn{background:var(--wn);color:var(--wt);padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:12px}
+.wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+td,th{border-bottom:1px solid var(--bd);padding:6px 8px;text-align:right;white-space:nowrap}
+td:first-child,th:first-child{text-align:left}
+tr.t td{font-weight:700}
+.btn{padding:8px 14px;border:0;border-radius:8px;background:var(--ac);color:#fff;cursor:pointer;font:inherit;margin:4px 6px 0 0}
+.btn.s{background:var(--card);color:var(--tx);border:1px solid var(--bd)}
+.mu{color:var(--mu);font-size:13px}
+.hide{display:none}
+</style>
+</head>
+<body>
+<main>
+<h1>勞健保費試算</h1>
+<div class="tabs"><button id="t1" class="on">試算</button><button id="t2">費率後台</button></div>
+
+<section id="p1">
+ <div class="card">
+  <div class="grid">
+   <div><label>試算年度（版本）</label><select id="ver"></select></div>
+   <div><label>加保</label><select id="ins"><option value="L">僅加勞保</option><option value="LH">勞保＋健保</option></select></div>
+   <div><label>國籍</label><select id="nat"><option value="T">本國籍</option><option value="F">外籍</option></select></div>
+   <div><label>月薪（元）</label><input id="monthly" type="number" min="0" value="40000"></div>
+   <div id="dp"><label>健保眷屬人數（上限 3）</label><input id="dep" type="number" min="0" max="3" value="0"></div>
+  </div>
+ </div>
+ <div class="warn">費率與級距請先與勞動部、健保署公告及舊系統結果核對。</div>
+ <div id="out"></div>
+</section>
+
+<section id="p2" class="hide">
+ <div id="login" class="card"><h2>人資後台登入</h2><div class="grid"><div><label>帳號（Email）</label><input id="em" type="email" autocomplete="username"></div><div><label>密碼</label><input id="pw" type="password" autocomplete="current-password"></div></div><button class="btn" id="lgn">登入</button><span id="lmsg" class="mu"></span></div>
+ <div id="adm" class="hide">
+ <div class="warn">修改會直接寫入資料庫，已發布的版本使用者立即看得到。解除已發布版本的鎖定期間，該版本會暫時從試算頁消失，修改完請重新發布。每次發布後建議按「匯出 JSON」備份。</div>
+ <div class="card">
+  <h2>版本管理</h2>
+  <div class="grid">
+   <div><label>編輯版本</label><select id="aver"></select></div>
+   <div><label>新版本名稱</label><input id="nname" placeholder="例如：民國116年01月01日適用"></div>
+   <div><label>新版本生效日</label><input id="ndate" type="date"></div>
+   <p id="stat" class="mu" style="grid-column:1/-1;margin:0"></p>
+  </div>
+  <button class="btn s" id="copy">複製目前版本為新版本</button>
+  <button class="btn s" id="exp">匯出 JSON</button>
+  <button class="btn s" id="out2">登出</button>
+  <label class="btn s" style="display:inline-block;width:auto;color:var(--tx)">匯入 JSON<input id="imp" type="file" accept=".json" class="hide"></label>
+ </div>
+ <div class="card">
+  <h2>費率與參數</h2>
+  <div class="grid" id="rates"></div>
+  <h2>級距表（以逗號分隔，需由小到大）</h2>
+  <label>勞保投保薪資</label><textarea id="tl"></textarea>
+  <label>勞退月提繳工資</label><textarea id="tp"></textarea>
+  <label>健保投保金額</label><textarea id="th"></textarea>
+  <label>職災保險投保薪資（上限與勞保不同）</label><textarea id="to"></textarea>
+  <button class="btn" id="save">套用修改</button>
+  <button class="btn s" id="pub">發布並鎖定此版本</button>
+  <button class="btn s" id="unl">解除鎖定</button>
+  <span id="msg" class="mu"></span>
+ </div>
+</div>
+</section>
+</main>
+<script>
+/* ===== 請填入你的 Supabase 專案資訊 ===== */
+const CFG={url:'https://anpnqmqsnumimwtaeule.supabase.co',key:'sb_publishable_clwwXy0ncvjIQYwA0wmPcg_3kc-qMfk'};
+/* ======================================= */
+const RL={basicWage:'基本工資（元）',acc:'勞保普通事故費率（%）',emp:'就業保險費率（%）',occ:'職災保險費率（%）',fund:'工資墊償基金提繳率（%）',pen:'勞退雇主提繳率（%）',hr:'健保費率（%）',hEe:'健保個人負擔比例（%）',hEr:'健保雇主負擔比例（%）',avg:'健保平均眷口數'};
+const $=i=>document.getElementById(i), fmt=n=>n.toLocaleString('en-US'), rd=Math.round;
+const lvl=(t,w)=>t.find(x=>x>=w)||t[t.length-1];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let DB=[], tok=null;
+function calc(V,o,wage){
+ const R=V.r, w=wage;
+ const L=lvl(V.labor,w), P=lvl(V.pension,wage), O=lvl(V.occ||V.labor,wage);
+ const fe=o.foreign;
+ const m={
+  accE:rd(L*R.acc/100*.2), empE:fe?0:rd(L*R.emp/100*.2),
+  accR:rd(L*R.acc/100*.7), empR:fe?0:rd(L*R.emp/100*.7),
+  occ:rd(O*R.occ/100), fund:rd(L*R.fund/100), pen:fe?0:rd(P*R.pen/100)};
+ return {L,P,m};
+}
+function laborTable(res,f,title){
+ const {m,L,P}=res, s=k=>rd(m[k]*f);
+ const eT=s('accE')+s('empE'), rT=s('accR')+s('empR')+s('occ')+s('fund');
+ return `<div class="card"><h2>${title}</h2><p class="mu">勞保級距 ${fmt(L)}　勞退級距 ${fmt(P)}</p><div class="wrap"><table>
+ <tr><th>項目</th><th>勞工負擔</th><th>雇主負擔</th></tr>
+ <tr><td>普通事故保險費</td><td>${fmt(s('accE'))}</td><td>${fmt(s('accR'))}</td></tr>
+ <tr><td>就業保險費（外籍免）</td><td>${fmt(s('empE'))}</td><td>${fmt(s('empR'))}</td></tr>
+ <tr><td>職業災害保險費</td><td>0</td><td>${fmt(s('occ'))}</td></tr>
+ <tr><td>工資墊償基金提繳費</td><td>0</td><td>${fmt(s('fund'))}</td></tr>
+ <tr class="t"><td>勞保合計</td><td>${fmt(eT)}</td><td>${fmt(rT)}</td></tr>
+ <tr><td>勞退雇主提繳（6%，外籍無）</td><td>0</td><td>${fmt(s('pen'))}</td></tr></table></div></div>`;
+}
+function run(){
+ if(!DB.length){$('out').innerHTML='<p class="mu">尚無已發布的費率版本。</p>';return}
+ const V=DB.find(v=>v.id===$('ver').value)||DB[0], R=V.r;
+ const o={foreign:$('nat').value==='F'};
+ const dep=Math.min(3,Math.max(0,+$('dep').value||0));
+ const monthWage=+$('monthly').value||0;
+ let h=laborTable(calc(V,o,monthWage),1,`月薪 ${fmt(monthWage)}，全月計算`);
+ if($('ins').value==='LH'){
+  const H=lvl(V.health,monthWage);
+  const ee=rd(H*R.hr/100*R.hEe/100)*(1+dep), er=rd(H*R.hr/100*R.hEr/100*(1+R.avg));
+  h+=`<div class="card"><h2>健保月保費（以月為單位，不可破月）</h2><div class="wrap"><table>
+  <tr><th>投保級距</th><th>勞工個人負擔（含眷屬 ${dep} 人）</th><th>雇主負擔</th></tr>
+  <tr><td>${fmt(H)}</td><td>${fmt(ee)}</td><td>${fmt(er)}</td></tr></table></div></div>`;
+ }
+ h+=`<p class="mu">金額四捨五入至個位數，與實際金額可能有 1～2 元誤差，僅供選擇投保方案參考。</p>`;
+ $('out').innerHTML=h;
+}
+function ui(){
+ const LH=$('ins').value==='LH';
+ $('dp').classList.toggle('hide',!LH);
+ run();
+}
+
+const dataOf=V=>({r:V.r,labor:V.labor,pension:V.pension,health:V.health,occ:V.occ||V.labor});
+const toV=w=>Object.assign({id:w.id,name:w.name,date:w.effective_date,locked:w.locked},w.data);
+const msg=t=>{$('msg').textContent=t};
+const cur=()=>DB.find(v=>v.id===$('aver').value)||DB[0];
+const parse=s=>s.split(/[,，\s]+/).filter(Boolean).map(Number);
+const okTable=a=>a.length>1&&a.every((x,i)=>x>0&&(i===0||x>a[i-1]));
+function showAdm(b){$('login').classList.toggle('hide',b);$('adm').classList.toggle('hide',!b)}
+
+async function api(path,opt){
+ opt=opt||{};
+ const h=Object.assign({apikey:CFG.key,'Content-Type':'application/json'},tok?{Authorization:'Bearer '+tok}:{},opt.headers);
+ const r=await fetch(CFG.url+path,Object.assign({},opt,{headers:h}));
+ if(!r.ok){
+  if(tok&&(r.status===401||r.status===403)&&/JWT|expired/i.test(await r.clone().text())){tok=null;showAdm(false);throw new Error('登入已過期，請重新登入。')}
+  throw new Error((await r.text())||String(r.status));
+ }
+ const t=await r.text();return t?JSON.parse(t):null;
+}
+async function load(){
+ try{
+  DB=(await api('/rest/v1/rate_versions?select=*&order=effective_date.desc')).map(toV);
+  fillVers();fillAdmin();run();
+ }catch(e){$('out').innerHTML='<p class="mu">讀取費率失敗：'+esc(e.message)+'</p>'}
+}
+function fillVers(){
+ const c1=$('ver').value,c2=$('aver').value;
+ $('ver').innerHTML=DB.map(v=>`<option value="${v.id}">${esc(v.name)}${v.locked?'':'（草稿）'}</option>`).join('');
+ $('aver').innerHTML=DB.map(v=>`<option value="${v.id}">${esc(v.name)}${v.locked?'（已發布，唯讀）':'（草稿，可編輯）'}</option>`).join('');
+ if(DB.some(v=>v.id===c1))$('ver').value=c1;
+ if(DB.some(v=>v.id===c2))$('aver').value=c2;
+}
+function fillAdmin(){
+ const V=cur();if(!V)return;
+ $('rates').innerHTML=Object.keys(RL).map(k=>`<div><label>${RL[k]}</label><input data-k="${k}" type="number" step="any" value="${V.r[k]}"></div>`).join('');
+ $('tl').value=V.labor.join(', ');$('tp').value=V.pension.join(', ');$('th').value=V.health.join(', ');$('to').value=(V.occ||V.labor).join(', ');
+ const lk=V.locked;
+ document.querySelectorAll('#rates input,#tl,#tp,#th,#to').forEach(e=>e.disabled=lk);
+ $('save').disabled=lk;$('pub').disabled=lk;$('unl').disabled=!lk;
+ $('stat').textContent=lk?'此版本已發布並鎖定，無法修改。若需調整，請複製為新版本，或按「解除鎖定」更正。':'此版本為草稿，使用者看不到；確認無誤後請按「發布並鎖定」。';
+}
+$('lgn').onclick=async()=>{
+ $('lmsg').textContent='登入中…';
+ try{
+  const r=await fetch(CFG.url+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:CFG.key,'Content-Type':'application/json'},body:JSON.stringify({email:$('em').value.trim(),password:$('pw').value})});
+  const j=await r.json();if(!r.ok)throw new Error(j.error_description||j.msg||'登入失敗');
+  tok=j.access_token;$('pw').value='';$('lmsg').textContent='';showAdm(true);await load();
+ }catch(e){$('lmsg').textContent=e.message}
+};
+$('out2').onclick=()=>{tok=null;showAdm(false);load()};
+$('save').onclick=async()=>{
+ const V=cur();if(!V||V.locked)return;
+ const t=[parse($('tl').value),parse($('tp').value),parse($('th').value),parse($('to').value)];
+ if(!t.every(okTable)){msg('級距表格式錯誤：需為由小到大的正數。');return}
+ const r=Object.assign({},V.r);document.querySelectorAll('#rates input').forEach(i=>r[i.dataset.k]=+i.value);
+ try{
+  await api('/rest/v1/rate_versions?id=eq.'+V.id,{method:'PATCH',body:JSON.stringify({data:{r,labor:t[0],pension:t[1],health:t[2],occ:t[3]}})});
+  await load();$('aver').value=V.id;$('ver').value=V.id;fillAdmin();run();
+  msg('已儲存到資料庫（'+new Date().toLocaleTimeString()+'）。請切換到「試算」頁驗證。');
+ }catch(e){msg('儲存失敗：'+e.message)}
+};
+async function setLock(b){
+ const V=cur();if(!V||V.locked===b)return;
+ try{
+  await api('/rest/v1/rate_versions?id=eq.'+V.id,{method:'PATCH',body:JSON.stringify({locked:b})});
+  await load();$('aver').value=V.id;fillAdmin();
+  msg(b?'已發布並鎖定，使用者現在可以選用此版本。':'已解除鎖定，此版本暫時從試算頁消失，修改完請重新發布。');
+ }catch(e){msg('操作失敗：'+e.message)}
+}
+$('pub').onclick=()=>setLock(true);
+$('unl').onclick=()=>setLock(false);
+$('copy').onclick=async()=>{
+ const V=cur(),nm=$('nname').value.trim(),dt=$('ndate').value;
+ if(!V)return;
+ if(!nm||!dt){msg('請輸入新版本名稱與生效日。');return}
+ try{
+  const res=await api('/rest/v1/rate_versions',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify({name:nm,effective_date:dt,locked:false,data:dataOf(V)})});
+  await load();$('aver').value=res[0].id;fillAdmin();msg('已建立新版本（草稿），可開始修改。');
+ }catch(e){msg('建立失敗：'+e.message+'（名稱與生效日不可與既有版本重複）')}
+};
+$('exp').onclick=()=>{
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,1)],{type:'application/json'}));
+ a.download='rates-backup.json';a.click();
+};
+$('imp').onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;
+ try{
+  const d=JSON.parse(await f.text());if(!Array.isArray(d))throw new Error('檔案格式不正確');
+  const rows=d.filter(v=>v.name&&v.date&&v.r&&v.labor).map(v=>({name:v.name,effective_date:v.date,locked:v.locked!==false,data:{r:v.r,labor:v.labor,pension:v.pension,health:v.health,occ:v.occ||v.labor}}));
+  if(!rows.length)throw new Error('檔案中沒有可匯入的版本（每個版本需有名稱與生效日）');
+  await api('/rest/v1/rate_versions?on_conflict=name,effective_date',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates'},body:JSON.stringify(rows)});
+  await load();msg('已匯入（名稱與生效日相同的版本會略過）。');
+ }catch(x){msg('匯入失敗：'+x.message)}
+ e.target.value='';
+};
+$('aver').onchange=fillAdmin;
+['ver','ins','nat'].forEach(i=>$(i).onchange=ui);
+['monthly','dep'].forEach(i=>$(i).oninput=run);
+$('t1').onclick=()=>{$('p1').classList.remove('hide');$('p2').classList.add('hide');$('t1').classList.add('on');$('t2').classList.remove('on');run()};
+$('t2').onclick=()=>{$('p2').classList.remove('hide');$('p1').classList.add('hide');$('t2').classList.add('on');$('t1').classList.remove('on')};
+showAdm(false);ui();load();
+</script>
+</body>
+</html>
